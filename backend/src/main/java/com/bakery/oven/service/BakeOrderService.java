@@ -64,6 +64,7 @@ public class BakeOrderService {
         order.recipeId = input.recipeId;
         order.trays = input.trays;
         order.startTime = null;
+        order.deadline = input.deadline;
         order.status = "待烤";
         order.createdAt = LocalDateTime.now();
         return orderRepository.save(order);
@@ -111,6 +112,10 @@ public class BakeOrderService {
                 }
             }
             order.trays = input.trays;
+        }
+        // 交付截止时间：非空才更新（与上方字段同一约定；截止时间变化会使已保存排产版本过期）
+        if (input.deadline != null) {
+            order.deadline = input.deadline;
         }
         return orderRepository.save(order);
     }

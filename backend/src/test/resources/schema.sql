@@ -22,6 +22,7 @@ CREATE TABLE bake_order (
     recipe_id  BIGINT,
     trays      INT          NOT NULL,
     start_time DATETIME,
+    deadline   DATETIME,
     status     VARCHAR(16),
     created_at DATETIME
 );
@@ -33,6 +34,37 @@ CREATE TABLE shipment (
     channel      VARCHAR(16),
     status       VARCHAR(16),
     created_at   DATETIME
+);
+
+-- 生产排产：版本头 + 明细快照 + 单行并发仲裁元数据
+CREATE TABLE bake_schedule (
+    id                BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name              VARCHAR(64) NOT NULL,
+    fingerprint       VARCHAR(64) NOT NULL,
+    base_version_id   BIGINT,
+    scheduled_count   INT NOT NULL DEFAULT 0,
+    unscheduled_count INT NOT NULL DEFAULT 0,
+    created_by        VARCHAR(32),
+    created_at        DATETIME
+);
+
+CREATE TABLE bake_schedule_item (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    schedule_id BIGINT      NOT NULL,
+    order_id    BIGINT      NOT NULL,
+    seq         INT         NOT NULL,
+    scheduled   TINYINT(1)  NOT NULL DEFAULT 0,
+    oven_id     BIGINT,
+    oven_code   VARCHAR(32),
+    est_start   DATETIME,
+    est_finish  DATETIME,
+    risk        VARCHAR(16),
+    reason      VARCHAR(255)
+);
+
+CREATE TABLE bake_schedule_meta (
+    id                BIGINT PRIMARY KEY,
+    latest_version_id BIGINT
 );
 
 INSERT INTO oven (id, code, capacity, status, created_at) VALUES
@@ -52,3 +84,6 @@ INSERT INTO bake_order (id, oven_id, recipe_id, trays, start_time, status, creat
 (1, 3, 1, 2, NULL, '待烤', NULL),
 (2, 3, 2, 3, '2026-10-06 09:00:00', '烘焙中', NULL),
 (3, 2, 1, 2, '2026-10-06 08:00:00', '烘焙中', NULL);
+
+-- 排产元数据单行（id 固定为 1）
+INSERT INTO bake_schedule_meta (id, latest_version_id) VALUES (1, NULL);

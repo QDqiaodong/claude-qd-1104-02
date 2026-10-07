@@ -5,6 +5,7 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import OvenView from '../views/OvenView.vue'
 import BreadRecipeView from '../views/BreadRecipeView.vue'
 import BakeOrderView from '../views/BakeOrderView.vue'
+import ScheduleView from '../views/ScheduleView.vue'
 import ShipmentView from '../views/ShipmentView.vue'
 
 const routes = [
@@ -12,6 +13,7 @@ const routes = [
   { path: '/oven', name: 'oven', component: OvenView },
   { path: '/bread-recipe', name: 'bread-recipe', component: BreadRecipeView },
   { path: '/bake-order', name: 'bake-order', component: BakeOrderView },
+  { path: '/schedule', name: 'schedule', component: ScheduleView },
   { path: '/shipment', name: 'shipment', component: ShipmentView },
   { path: '/:pathMatch(.*)*', redirect: '/oven' }
 ]

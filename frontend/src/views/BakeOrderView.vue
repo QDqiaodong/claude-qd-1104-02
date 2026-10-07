@@ -11,7 +11,11 @@ const recipes = ref([])
 const COLS = ['待烤', '烘焙中', '已出炉', '已质检']
 
 const dialog = ref(false)
-const form = reactive({ ovenId: null, recipeId: null, trays: 1 })
+const form = reactive({ ovenId: null, recipeId: null, trays: 1, deadline: null })
+
+// 编辑（仅待烤工单：烤盘数 / 交付截止时间等变化会使已保存排产版本过期）
+const editDialog = ref(false)
+const editForm = reactive({ id: null, ovenId: null, recipeId: null, trays: 1, deadline: null })
 
 const ovenMap = computed(() => Object.fromEntries(ovens.value.map((o) => [o.id, o])))
 const recipeMap = computed(() => Object.fromEntries(recipes.value.map((r) => [r.id, r])))
@@ -41,6 +45,19 @@ const ovenCapacity = computed(() => {
   return o ? o.capacity : null
 })
 
+const editCapacity = computed(() => {
+  const o = ovenMap.value[editForm.ovenId]
+  return o ? o.capacity : null
+})
+
+// 编辑时下拉保留工单当前归属烤箱（即使已故障；改挂到故障炉仍会被后端拒绝）
+const editSelectableOvens = computed(() => {
+  const list = [...selectableOvens.value]
+  const own = ovenMap.value[editForm.ovenId]
+  if (own && !list.some((o) => o.id === own.id)) list.push(own)
+  return list.sort((a, b) => a.id - b.id)
+})
+
 async function load() {
   const [od, ov, rp] = await Promise.all([api.listBakeOrders(), api.listOvens(), api.listBreadRecipes()])
   orders.value = od
@@ -51,16 +68,36 @@ async function load() {
 async function refresh() { await load(); emitChanged() }
 
 function openCreate() {
-  Object.assign(form, { ovenId: null, recipeId: null, trays: 1 })
+  Object.assign(form, { ovenId: null, recipeId: null, trays: 1, deadline: null })
   dialog.value = true
 }
 
 async function submit() {
   try {
-    await api.createBakeOrder({ ovenId: form.ovenId, recipeId: form.recipeId, trays: form.trays })
+    await api.createBakeOrder({ ovenId: form.ovenId, recipeId: form.recipeId, trays: form.trays, deadline: form.deadline })
     dialog.value = false
     await refresh()
     ElMessage.success('已排产')
+  } catch (e) { ElMessage.error(e.message) }
+}
+
+function openEdit(o) {
+  Object.assign(editForm, {
+    id: o.id, ovenId: o.ovenId, recipeId: o.recipeId, trays: o.trays,
+    deadline: o.deadline || null
+  })
+  editDialog.value = true
+}
+
+async function submitEdit() {
+  try {
+    await api.updateBakeOrder(editForm.id, {
+      ovenId: editForm.ovenId, recipeId: editForm.recipeId,
+      trays: editForm.trays, deadline: editForm.deadline
+    })
+    editDialog.value = false
+    await refresh()
+    ElMessage.success('已保存，相关排产版本将标记为过期')
   } catch (e) { ElMessage.error(e.message) }
 }
 
@@ -71,6 +108,8 @@ async function act(id, fn, label) {
 
 const emit = defineEmits(['changed'])
 function emitChanged() { emit('changed') }
+
+const fmt = (s) => (s ? String(s).replace('T', ' ').slice(0, 16) : '-')
 
 // 接管成功后看板重拉（App 层会整体重挂载，这里再订阅一次保证视图内数据一致）
 const offTaken = bus.on('takeover:taken', () => load())
@@ -121,6 +160,7 @@ onUnmounted(offTaken)
             </div>
             <div class="recipe">{{ recipeMap[o.recipeId] ? recipeMap[o.recipeId].name : '?' }}</div>
             <div class="meta">烤盘 {{ o.trays }} / 容量 {{ ovenMap[o.ovenId] ? ovenMap[o.ovenId].capacity : '-' }}</div>
+            <div class="meta" v-if="o.deadline">截止 {{ fmt(o.deadline) }}</div>
             <div class="meta" v-if="o.startTime">开始 {{ o.startTime }}</div>
             <div
               v-if="isBroken(o.ovenId)"
@@ -132,6 +172,7 @@ onUnmounted(offTaken)
             </div>
             <div class="acts">
               <el-button size="small" type="primary" v-if="c === '待烤'" @click="act(o.id, api.startBakeOrder, '开始烘焙')">开始</el-button>
+              <el-button size="small" v-if="c === '待烤'" @click="openEdit(o)">编辑</el-button>
               <el-button size="small" type="warning" v-if="c === '烘焙中'" @click="act(o.id, api.doneBakeOrder, '出炉')">出炉</el-button>
               <el-button size="small" type="success" v-if="c === '已出炉'" @click="act(o.id, api.inspectBakeOrder, '质检')">质检</el-button>
               <el-button size="small" type="danger" v-if="isBroken(o.ovenId) && (c === '待烤' || c === '烘焙中')" @click="openTakeover(o.ovenId)">故障接管</el-button>
@@ -159,10 +200,45 @@ onUnmounted(offTaken)
           <el-input-number v-model="form.trays" :min="1" :max="ovenCapacity || 99" />
           <span class="hint" v-if="ovenCapacity"> ≤ 容量 {{ ovenCapacity }}</span>
         </el-form-item>
+        <el-form-item label="交付截止">
+          <el-date-picker
+            v-model="form.deadline" type="datetime" placeholder="可选"
+            value-format="YYYY-MM-DD[T]HH:mm:ss" style="width: 220px"
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialog = false">取消</el-button>
         <el-button type="primary" @click="submit">排产</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="editDialog" :title="'编辑待烤工单 #' + editForm.id" width="440px">
+      <el-form label-width="100px">
+        <el-form-item label="烤箱">
+          <el-select v-model="editForm.ovenId" placeholder="选择烤箱" style="width: 220px">
+            <el-option v-for="o in editSelectableOvens" :key="o.id" :label="o.code + '（容量' + o.capacity + (o.status === '故障' ? '，故障' : '') + '）'" :value="o.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="配方">
+          <el-select v-model="editForm.recipeId" placeholder="选择上架配方" style="width: 220px">
+            <el-option v-for="r in selectableRecipes" :key="r.id" :label="r.name + '（需' + r.needTrays + '盘）'" :value="r.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="实际烤盘数">
+          <el-input-number v-model="editForm.trays" :min="1" :max="editCapacity || 99" />
+          <span class="hint" v-if="editCapacity"> ≤ 容量 {{ editCapacity }}</span>
+        </el-form-item>
+        <el-form-item label="交付截止">
+          <el-date-picker
+            v-model="editForm.deadline" type="datetime" placeholder="可选"
+            value-format="YYYY-MM-DD[T]HH:mm:ss" style="width: 220px"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editDialog = false">取消</el-button>
+        <el-button type="primary" @click="submitEdit">保存</el-button>
       </template>
     </el-dialog>
   </div>

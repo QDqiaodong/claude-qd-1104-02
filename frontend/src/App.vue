@@ -6,6 +6,7 @@ import api from './api'
 import OvenView from './views/OvenView.vue'
 import BreadRecipeView from './views/BreadRecipeView.vue'
 import BakeOrderView from './views/BakeOrderView.vue'
+import ScheduleView from './views/ScheduleView.vue'
 import ShipmentView from './views/ShipmentView.vue'
 import TakeoverDialog from './components/TakeoverDialog.vue'
 import bus, { takeoverState } from './utils/bus'
@@ -26,6 +27,10 @@ const modules = [
   {
     path: '/bake-order', label: '工单', comp: BakeOrderView,
     icon: '<rect x="5" y="4" width="14" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="8" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="1.4"/><line x1="8" y1="13" x2="16" y2="13" stroke="currentColor" stroke-width="1.4"/><line x1="8" y1="17" x2="13" y2="17" stroke="currentColor" stroke-width="1.4"/>'
+  },
+  {
+    path: '/schedule', label: '排产', comp: ScheduleView,
+    icon: '<circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 7.5v5l3.2 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
   },
   {
     path: '/shipment', label: '出货', comp: ShipmentView,
@@ -57,13 +62,15 @@ onUnmounted(() => bus.off('takeover:taken', onTaken))
 
 async function loadCounts() {
   try {
-    const [ov, rp, od, sh] = await Promise.all([
-      api.listOvens(), api.listBreadRecipes(), api.listBakeOrders(), api.listShipments()
+    const [ov, rp, od, sh, sc] = await Promise.all([
+      api.listOvens(), api.listBreadRecipes(), api.listBakeOrders(), api.listShipments(),
+      api.scheduleCurrent()
     ])
     counts.value = {
       '/oven': ov.length,
       '/bread-recipe': rp.length,
       '/bake-order': od.length,
+      '/schedule': (sc.scheduled?.length || 0) + (sc.unscheduled?.length || 0),
       '/shipment': sh.length
     }
   } catch (e) { /* 计数失败不影响主流程 */ }

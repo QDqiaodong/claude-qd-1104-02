@@ -47,6 +47,11 @@ export default {
   takeover: (sourceOvenId, items) =>
     call(http.post(`/takeovers/ovens/${sourceOvenId}/take`, { items })),
 
+  // ---------------- 生产排产 ----------------
+  scheduleCurrent: () => call(http.get('/schedule/current')),
+  schedulePreview: (priorities) => call(http.post('/schedule/preview', { priorities })),
+  saveScheduleVersion: (d) => call(http.post('/schedule/versions', d)),
+
   // ---------------- 出货 ----------------
   listShipments: (status) => call(http.get('/shipments', params(status ? { status } : {}))),
   createShipment: (d) => call(http.post('/shipments', d)),

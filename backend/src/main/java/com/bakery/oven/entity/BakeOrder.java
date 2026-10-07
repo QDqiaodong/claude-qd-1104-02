@@ -31,6 +31,10 @@ public class BakeOrder {
     @Column(name = "start_time")
     public LocalDateTime startTime;
 
+    /** 交付截止时间（可空，排产逾期评估用） */
+    @Column(name = "deadline")
+    public LocalDateTime deadline;
+
     /** 待烤 / 烘焙中 / 已出炉 / 已质检 */
     @Column(name = "status", nullable = false, length = 16)
     public String status;
