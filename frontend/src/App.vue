@@ -6,12 +6,13 @@ import api from './api'
 import OvenView from './views/OvenView.vue'
 import BreadRecipeView from './views/BreadRecipeView.vue'
 import BakeOrderView from './views/BakeOrderView.vue'
+import ScheduleView from './views/ScheduleView.vue'
 import ShipmentView from './views/ShipmentView.vue'
 import TakeoverDialog from './components/TakeoverDialog.vue'
 import bus, { takeoverState } from './utils/bus'
 
 // ------------------------------------------------------------------
-// 导航形态：图标窄侧栏（左侧窄竖栏，4 个模块各一个 icon 按钮）
+// 导航形态：图标窄侧栏（左侧窄竖栏，5 个模块各一个 icon 按钮）
 // ------------------------------------------------------------------
 
 const modules = [
@@ -26,6 +27,10 @@ const modules = [
   {
     path: '/bake-order', label: '工单', comp: BakeOrderView,
     icon: '<rect x="5" y="4" width="14" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="8" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="1.4"/><line x1="8" y1="13" x2="16" y2="13" stroke="currentColor" stroke-width="1.4"/><line x1="8" y1="17" x2="13" y2="17" stroke="currentColor" stroke-width="1.4"/>'
+  },
+  {
+    path: '/schedule', label: '排产', comp: ScheduleView,
+    icon: '<rect x="3" y="5" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" stroke-width="1.6"/><line x1="8" y1="3" x2="8" y2="7" stroke="currentColor" stroke-width="1.6"/><line x1="16" y1="3" x2="16" y2="7" stroke="currentColor" stroke-width="1.6"/><line x1="7" y1="14" x2="11" y2="14" stroke="currentColor" stroke-width="1.4"/><line x1="7" y1="17" x2="14" y2="17" stroke="currentColor" stroke-width="1.4"/>'
   },
   {
     path: '/shipment', label: '出货', comp: ShipmentView,
@@ -64,6 +69,7 @@ async function loadCounts() {
       '/oven': ov.length,
       '/bread-recipe': rp.length,
       '/bake-order': od.length,
+      '/schedule': od.filter((o) => o.status === '待烤').length,
       '/shipment': sh.length
     }
   } catch (e) { /* 计数失败不影响主流程 */ }

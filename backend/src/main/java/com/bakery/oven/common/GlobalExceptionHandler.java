@@ -23,6 +23,14 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 排产保存冲突：409（他人已保存更新版本，失败方需刷新查看最新顺序）
+     */
+    @ExceptionHandler(ScheduleConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleScheduleConflict(ScheduleConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.fail(e.getMessage()));
+    }
+
+    /**
      * 参数注解校验失败：400 + 字段名与提示
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -7,6 +7,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -30,6 +32,11 @@ public class BakeOrder {
     /** 开始时间（可空） */
     @Column(name = "start_time")
     public LocalDateTime startTime;
+
+    /** 交付截止时间（可空，生产排产输入） */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @Column(name = "due_time")
+    public LocalDateTime dueTime;
 
     /** 待烤 / 烘焙中 / 已出炉 / 已质检 */
     @Column(name = "status", nullable = false, length = 16)

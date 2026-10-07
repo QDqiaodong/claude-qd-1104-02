@@ -11,7 +11,11 @@ const recipes = ref([])
 const COLS = ['待烤', '烘焙中', '已出炉', '已质检']
 
 const dialog = ref(false)
-const form = reactive({ ovenId: null, recipeId: null, trays: 1 })
+const form = reactive({ ovenId: null, recipeId: null, trays: 1, dueTime: null })
+
+// 待烤工单改期/改盘：烤盘数与交付截止是排产输入，修改后已保存的排产版本会过期
+const editDialog = ref(false)
+const editForm = reactive({ id: null, trays: 1, dueTime: null })
 
 const ovenMap = computed(() => Object.fromEntries(ovens.value.map((o) => [o.id, o])))
 const recipeMap = computed(() => Object.fromEntries(recipes.value.map((r) => [r.id, r])))
@@ -51,16 +55,30 @@ async function load() {
 async function refresh() { await load(); emitChanged() }
 
 function openCreate() {
-  Object.assign(form, { ovenId: null, recipeId: null, trays: 1 })
+  Object.assign(form, { ovenId: null, recipeId: null, trays: 1, dueTime: null })
   dialog.value = true
 }
 
 async function submit() {
   try {
-    await api.createBakeOrder({ ovenId: form.ovenId, recipeId: form.recipeId, trays: form.trays })
+    await api.createBakeOrder({ ovenId: form.ovenId, recipeId: form.recipeId, trays: form.trays, dueTime: form.dueTime })
     dialog.value = false
     await refresh()
     ElMessage.success('已排产')
+  } catch (e) { ElMessage.error(e.message) }
+}
+
+function openEdit(o) {
+  Object.assign(editForm, { id: o.id, trays: o.trays, dueTime: o.dueTime || null })
+  editDialog.value = true
+}
+
+async function submitEdit() {
+  try {
+    await api.updateBakeOrder(editForm.id, { trays: editForm.trays, dueTime: editForm.dueTime })
+    editDialog.value = false
+    await refresh()
+    ElMessage.success('已更新；已保存的排产版本会标记为已过期，可到「排产」页重算')
   } catch (e) { ElMessage.error(e.message) }
 }
 
@@ -121,6 +139,7 @@ onUnmounted(offTaken)
             </div>
             <div class="recipe">{{ recipeMap[o.recipeId] ? recipeMap[o.recipeId].name : '?' }}</div>
             <div class="meta">烤盘 {{ o.trays }} / 容量 {{ ovenMap[o.ovenId] ? ovenMap[o.ovenId].capacity : '-' }}</div>
+            <div class="meta" v-if="o.dueTime">截止 {{ o.dueTime }}</div>
             <div class="meta" v-if="o.startTime">开始 {{ o.startTime }}</div>
             <div
               v-if="isBroken(o.ovenId)"
@@ -132,6 +151,7 @@ onUnmounted(offTaken)
             </div>
             <div class="acts">
               <el-button size="small" type="primary" v-if="c === '待烤'" @click="act(o.id, api.startBakeOrder, '开始烘焙')">开始</el-button>
+              <el-button size="small" v-if="c === '待烤'" @click="openEdit(o)">改期</el-button>
               <el-button size="small" type="warning" v-if="c === '烘焙中'" @click="act(o.id, api.doneBakeOrder, '出炉')">出炉</el-button>
               <el-button size="small" type="success" v-if="c === '已出炉'" @click="act(o.id, api.inspectBakeOrder, '质检')">质检</el-button>
               <el-button size="small" type="danger" v-if="isBroken(o.ovenId) && (c === '待烤' || c === '烘焙中')" @click="openTakeover(o.ovenId)">故障接管</el-button>
@@ -159,10 +179,48 @@ onUnmounted(offTaken)
           <el-input-number v-model="form.trays" :min="1" :max="ovenCapacity || 99" />
           <span class="hint" v-if="ovenCapacity"> ≤ 容量 {{ ovenCapacity }}</span>
         </el-form-item>
+        <el-form-item label="交付截止">
+          <el-date-picker
+            v-model="form.dueTime"
+            type="datetime"
+            placeholder="可选，留空表示无截止"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 220px"
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialog = false">取消</el-button>
         <el-button type="primary" @click="submit">排产</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 待烤工单改期/改盘 -->
+    <el-dialog v-model="editDialog" title="调整待烤工单" width="440px">
+      <el-form label-width="100px">
+        <el-form-item label="工单">
+          <span>#{{ editForm.id }}</span>
+        </el-form-item>
+        <el-form-item label="实际烤盘数">
+          <el-input-number v-model="editForm.trays" :min="1" :max="99" />
+        </el-form-item>
+        <el-form-item label="交付截止">
+          <el-date-picker
+            v-model="editForm.dueTime"
+            type="datetime"
+            placeholder="留空则不修改截止时间"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 220px"
+          />
+        </el-form-item>
+      </el-form>
+      <el-alert
+        type="info" :closable="false"
+        title="烤盘数或交付截止变化后，已保存的排产版本会标记为已过期，需到「排产」页基于最新数据重算。"
+      />
+      <template #footer>
+        <el-button @click="editDialog = false">取消</el-button>
+        <el-button type="primary" @click="submitEdit">保存</el-button>
       </template>
     </el-dialog>
   </div>

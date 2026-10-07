@@ -6,7 +6,9 @@ http.interceptors.response.use(
   (response) => response,
   (error) => {
     const message = error?.response?.data?.message || error?.message || '请求失败'
-    return Promise.reject(new Error(message))
+    const err = new Error(message)
+    err.status = error?.response?.status
+    return Promise.reject(err)
   }
 )
 
@@ -46,6 +48,13 @@ export default {
   takeoverPreview: (sourceOvenId) => call(http.get(`/takeovers/ovens/${sourceOvenId}/preview`)),
   takeover: (sourceOvenId, items) =>
     call(http.post(`/takeovers/ovens/${sourceOvenId}/take`, { items })),
+
+  // ---------------- 生产排产 ----------------
+  scheduleCurrent: () => call(http.get('/schedule/current')),
+  schedulePreview: (priorities) => call(http.post('/schedule/preview', { priorities })),
+  scheduleSave: (d) => call(http.post('/schedule/versions', d)),
+  scheduleVersions: () => call(http.get('/schedule/versions')),
+  scheduleVersion: (id) => call(http.get(`/schedule/versions/${id}`)),
 
   // ---------------- 出货 ----------------
   listShipments: (status) => call(http.get('/shipments', params(status ? { status } : {}))),
